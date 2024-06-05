@@ -160,8 +160,8 @@ export default defineComponent({
 
           // Update the ball position based on physics simulation
           if (!ballStuckToPaddle) {
-            ball.position.copy(ballBody.position as THREE.Vector3)
-            ball.quaternion.copy(ballBody.quaternion as THREE.Quaternion)
+            ball.position.copy(ballBody.position as unknown as THREE.Vector3)
+            ball.quaternion.copy(ballBody.quaternion as unknown as THREE.Quaternion)
           }
 
           renderer.render(scene, camera)
