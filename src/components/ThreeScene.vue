@@ -5,7 +5,6 @@
 <script lang="ts">
 import { defineComponent, onMounted, ref } from 'vue'
 import * as THREE from 'three'
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls'
 
 export default defineComponent({
   name: 'ThreeScene',
@@ -14,7 +13,6 @@ export default defineComponent({
     const paddleSpeed = 0.02
     const tableWidth = 8
     const tableHeight = 4
-    let controls: PointerLockControls
     let paddle: THREE.Mesh
 
     onMounted(() => {
@@ -23,8 +21,8 @@ export default defineComponent({
         const scene = new THREE.Scene()
 
         // Create a camera
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
-        camera.position.set(0, 3, 5)
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
+        camera.position.set(0, 6, 8)
         camera.lookAt(0, 0, 0)
 
         // Create a renderer
@@ -40,35 +38,33 @@ export default defineComponent({
         scene.add(table)
 
         // Create the net
-        const netGeometry = new THREE.PlaneGeometry(tableWidth, 0.6)
+        const netGeometry = new THREE.PlaneGeometry(tableWidth, 0.5)
         const netMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff })
         const net = new THREE.Mesh(netGeometry, netMaterial)
-        net.position.y = 0.01
+        net.position.y = 0.3
         net.position.z = 0
         net.rotation.x = -Math.PI / 6
         scene.add(net)
 
         // Create the paddle
-        const paddleRadius = 0.3
+        const paddleRadius = 0.4
         const paddleSegments = 32
         const paddleGeometry = new THREE.CircleGeometry(paddleRadius, paddleSegments)
         const paddleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
         paddle = new THREE.Mesh(paddleGeometry, paddleMaterial)
-        paddle.position.set(0, 0, 0) // Positioned behind the table
+        paddle.position.set(0, 2, 4) // Positioned in front of the user
+        paddle.rotation.x = 0 // Ensure the paddle is parallel to the screen plane
         scene.add(paddle)
-
-        // Initialize PointerLockControls
-        controls = new PointerLockControls(paddle, renderer.domElement)
 
         // Add event listener for locking the pointer
         threeContainer.value.addEventListener('click', () => {
-          controls.lock()
+          document.body.requestPointerLock()
         })
 
         // Update paddle position based on pointer movement
         const onPointerMove = (event: MouseEvent) => {
-          if (controls.isLocked) {
-            // Calculate the normalized mouse coordinates (-1 to +1)
+          if (document.pointerLockElement === document.body) {
+            // Calculate movement
             const movementX = event.movementX || 0
             const movementY = event.movementY || 0
 
@@ -76,10 +72,9 @@ export default defineComponent({
             paddle.position.x += movementX * paddleSpeed
             paddle.position.y -= movementY * paddleSpeed
 
-            // Limit paddle movement within the screen plane and keep it behind the table
+            // Limit paddle movement within the screen plane
             paddle.position.x = Math.max(-tableWidth / 2, Math.min(tableWidth / 2, paddle.position.x))
-            paddle.position.y = Math.max(0, Math.min(tableHeight / 2, paddle.position.y))
-            paddle.position.z = 2.5 // Ensure paddle stays behind the table
+            paddle.position.y = Math.max(1, Math.min(3, paddle.position.y)) // Limit to a range in front of the table
           }
         }
         document.addEventListener('mousemove', onPointerMove, false)
