@@ -5,6 +5,7 @@
 <script lang="ts">
 import { defineComponent, onMounted, ref } from 'vue'
 import * as THREE from 'three'
+import { World, Body, Box, Sphere, Vec3, Plane, Material, ContactMaterial } from 'cannon-es'
 
 export default defineComponent({
   name: 'ThreeScene',
@@ -14,6 +15,10 @@ export default defineComponent({
     const tableWidth = 8
     const tableHeight = 4
     let paddle: THREE.Mesh
+    let ball: THREE.Mesh
+    let paddleBody: Body
+    let ballBody: Body
+    let world: World
 
     onMounted(() => {
       if (threeContainer.value) {
@@ -50,11 +55,59 @@ export default defineComponent({
         const paddleRadius = 0.4
         const paddleSegments = 32
         const paddleGeometry = new THREE.CircleGeometry(paddleRadius, paddleSegments)
-        const paddleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
-        paddle = new THREE.Mesh(paddleGeometry, paddleMaterial)
+        const paddleMaterialThree = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+        paddle = new THREE.Mesh(paddleGeometry, paddleMaterialThree)
         paddle.position.set(0, 2, 4) // Positioned in front of the user
         paddle.rotation.x = 0 // Ensure the paddle is parallel to the screen plane
         scene.add(paddle)
+
+        // Create the ball
+        const ballGeometry = new THREE.SphereGeometry(0.1, 32, 32)
+        const ballMaterialThree = new THREE.MeshBasicMaterial({ color: 0xffffff })
+        ball = new THREE.Mesh(ballGeometry, ballMaterialThree)
+        ball.position.set(0, 1, -tableHeight / 2 + 0.5) // Positioned at the opponent's side
+        scene.add(ball)
+
+        // Set up the physics world
+        world = new World()
+        world.gravity.set(0, -9.82, 0) // Earth gravity in m/s^2
+
+        // Create physics materials
+        const groundPhysicsMaterial = new Material('groundMaterial')
+        const paddlePhysicsMaterial = new Material('paddleMaterial')
+        const ballPhysicsMaterial = new Material('ballMaterial')
+        const contactMaterial = new ContactMaterial(ballPhysicsMaterial, groundPhysicsMaterial, {
+          friction: 0.0,
+          restitution: 0.7, // Bounciness
+        })
+        world.addContactMaterial(contactMaterial)
+
+        // Create the paddle physics body
+        paddleBody = new Body({
+          mass: 0, // Static body
+          position: new Vec3(paddle.position.x, paddle.position.y, paddle.position.z),
+          shape: new Box(new Vec3(paddleRadius, paddleRadius, 0.1)),
+          material: paddlePhysicsMaterial,
+        })
+        world.addBody(paddleBody)
+
+        // Create the ball physics body
+        ballBody = new Body({
+          mass: 0.1, // Make it dynamic
+          position: new Vec3(ball.position.x, ball.position.y, ball.position.z),
+          shape: new Sphere(0.1),
+          material: ballPhysicsMaterial,
+        })
+        world.addBody(ballBody)
+
+        // Create the table physics body
+        const tableBody = new Body({
+          mass: 0, // Static body
+          shape: new Plane(),
+          material: groundPhysicsMaterial,
+        })
+        tableBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(tableBody)
 
         // Add event listener for locking the pointer
         threeContainer.value.addEventListener('click', () => {
@@ -75,6 +128,9 @@ export default defineComponent({
             // Limit paddle movement within the screen plane
             paddle.position.x = Math.max(-tableWidth / 2, Math.min(tableWidth / 2, paddle.position.x))
             paddle.position.y = Math.max(1, Math.min(3, paddle.position.y)) // Limit to a range in front of the table
+
+            // Update paddle physics body position
+            paddleBody.position.set(paddle.position.x, paddle.position.y, paddle.position.z)
           }
         }
         document.addEventListener('mousemove', onPointerMove, false)
@@ -82,6 +138,14 @@ export default defineComponent({
         // Animation loop
         const animate = () => {
           requestAnimationFrame(animate)
+
+          // Step the physics world
+          world.step(1 / 60)
+
+          // Update the ball position based on physics simulation
+          ball.position.copy(ballBody.position as THREE.Vector3)
+          ball.quaternion.copy(ballBody.quaternion as THREE.Quaternion)
+
           renderer.render(scene, camera)
         }
 
