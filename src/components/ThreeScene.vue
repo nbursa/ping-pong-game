@@ -19,6 +19,7 @@ export default defineComponent({
     let paddleBody: Body
     let ballBody: Body
     let world: World
+    let ballStuckToPaddle = true
 
     onMounted(() => {
       if (threeContainer.value) {
@@ -65,7 +66,7 @@ export default defineComponent({
         const ballGeometry = new THREE.SphereGeometry(0.1, 32, 32)
         const ballMaterialThree = new THREE.MeshBasicMaterial({ color: 0xffffff })
         ball = new THREE.Mesh(ballGeometry, ballMaterialThree)
-        ball.position.set(0, 1, -tableHeight / 2 + 0.5) // Positioned at the opponent's side
+        ball.position.set(paddle.position.x, paddle.position.y, paddle.position.z - 0.5) // Initially on the paddle facing the table
         scene.add(ball)
 
         // Set up the physics world
@@ -86,7 +87,7 @@ export default defineComponent({
         paddleBody = new Body({
           mass: 0, // Static body
           position: new Vec3(paddle.position.x, paddle.position.y, paddle.position.z),
-          shape: new Box(new Vec3(paddleRadius, paddleRadius, 0.1)),
+          shape: new Box(new Vec3(paddleRadius, 0.1, paddleRadius)),
           material: paddlePhysicsMaterial,
         })
         world.addBody(paddleBody)
@@ -131,9 +132,24 @@ export default defineComponent({
 
             // Update paddle physics body position
             paddleBody.position.set(paddle.position.x, paddle.position.y, paddle.position.z)
+
+            // If the ball is stuck to the paddle, update its position as well
+            if (ballStuckToPaddle) {
+              ball.position.set(paddle.position.x, paddle.position.y, paddle.position.z - 0.5)
+              ballBody.position.set(ball.position.x, ball.position.y, ball.position.z)
+            }
           }
         }
         document.addEventListener('mousemove', onPointerMove, false)
+
+        // Serve the ball on space key press
+        const onSpacePress = (event: KeyboardEvent) => {
+          if (event.code === 'Space' && ballStuckToPaddle) {
+            ballStuckToPaddle = false
+            ballBody.velocity.set(0, 0, -5) // Serve the ball towards the opponent
+          }
+        }
+        document.addEventListener('keydown', onSpacePress, false)
 
         // Animation loop
         const animate = () => {
@@ -143,8 +159,10 @@ export default defineComponent({
           world.step(1 / 60)
 
           // Update the ball position based on physics simulation
-          ball.position.copy(ballBody.position as THREE.Vector3)
-          ball.quaternion.copy(ballBody.quaternion as THREE.Quaternion)
+          if (!ballStuckToPaddle) {
+            ball.position.copy(ballBody.position as THREE.Vector3)
+            ball.quaternion.copy(ballBody.quaternion as THREE.Quaternion)
+          }
 
           renderer.render(scene, camera)
         }
